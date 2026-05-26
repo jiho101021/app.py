@@ -2,7 +2,7 @@ from flask import Flask, render_template_string
 
 app = Flask(__name__)
 
-html = """<!DOCTYPE html>
+html_content = """<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -88,7 +88,6 @@ html = """<!DOCTYPE html>
       document.getElementById('th-goals').textContent = t.goals;
     }
 
-    // 초기 실행
     renderTable(players);
   </script>
 </body>
@@ -96,7 +95,7 @@ html = """<!DOCTYPE html>
 
 @app.route('/')
 def home():
-    return render_template_string(html)
+    return render_template_string(html_content)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
