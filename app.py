@@ -1,9 +1,6 @@
 import streamlit as st
-from xai_sdk import Client
-from xai_sdk.chat import user, system
-import os
+from openai import OpenAI
 
-# 페이지 설정
 st.set_page_config(
     page_title="⚽ Soccer Star AI",
     page_icon="⚽",
@@ -13,57 +10,52 @@ st.set_page_config(
 st.title("⚽ Soccer Star AI")
 st.caption("축구 선수의 커리어, 득점, 어시스트, 국적 등을 물어보세요!")
 
-# 세션 상태 초기화
+# 세션 상태
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# OpenAI 클라이언트 (xAI)
 if "client" not in st.session_state:
     try:
         api_key = st.secrets["XAI_API_KEY"]
-        st.session_state.client = Client(api_key=api_key)
+        st.session_state.client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.x.ai/v1"
+        )
     except Exception as e:
-        st.error("API 키를 불러올 수 없습니다. Streamlit Secrets에 XAI_API_KEY를 추가해주세요.")
+        st.error("❌ Secrets에서 XAI_API_KEY를 찾을 수 없습니다.")
         st.stop()
 
-# 이전 대화 기록 표시
+# 이전 대화 표시
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 시스템 프롬프트 (축구 전문가 역할)
-system_prompt = """You are a professional soccer analyst with deep knowledge of football history.
-You provide accurate information about players' careers, goals, assists, nationality, clubs, achievements, and statistics.
-Always answer in Korean. Be friendly and enthusiastic about football."""
+system_prompt = """당신은 세계 최고의 축구 전문가입니다. 
+선수의 국적, 커리어, 클럽 경력, 득점 기록, 어시스트, 수상 경력 등을 정확하게 알려주세요.
+항상 한국어로 친근하게 답변합니다."""
 
-# 사용자 입력
-if prompt := st.chat_input("메시지를 입력하세요... (예: 메시의 통산 골 기록은?)"):
-    # 사용자 메시지 추가
+if prompt := st.chat_input("선수 이름을 입력하세요. 예: 메시 통산골, 호날두 국적..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # AI 응답 생성
     with st.chat_message("assistant"):
-        with st.spinner("Grok이 생각 중... ⚽"):
+        with st.spinner("Grok이 분석중입니다... ⚽"):
             try:
-                chat = st.session_state.client.chat.create(model="grok-4.3")  # 현재 가장 좋은 모델
-                
-                # 시스템 프롬프트 + 이전 대화 기록
-                chat.append(system(system_prompt))
-                
-                for msg in st.session_state.messages:
-                    if msg["role"] == "user":
-                        chat.append(user(msg["content"]))
-                    elif msg["role"] == "assistant":
-                        chat.append({"role": "assistant", "content": msg["content"]})  # 이전 응답도 추가
-
-                response = chat.sample()
-                answer = response.content
+                response = st.session_state.client.chat.completions.create(
+                    model="grok-4.3",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        *[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
+                    ],
+                    temperature=0.7,
+                    max_tokens=2048
+                )
+                answer = response.choices[0].message.content
                 
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
-
+                
             except Exception as e:
-                error_msg = f"오류가 발생했습니다: {str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                st.error(f"오류: {str(e)}")
